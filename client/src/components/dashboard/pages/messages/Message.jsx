@@ -42,10 +42,10 @@ export default function Message({ email }) {
 
     emailjs
       .sendForm(
-        'service_2kyejr4',
-        'Loan_Approval',
+        'service_kmevei6', // Your Service ID (confirm in dashboard)
+        'template_sghtc8m', // Replace with the new Template ID
         e.target,
-        'mDqAo3YVF6cq60oy7'
+        'NrntIF31nA2kRR8DB' // // Use the new Public Key
       )
       .then(
         (result) => {

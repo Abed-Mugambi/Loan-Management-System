@@ -5,6 +5,9 @@ import bcrypt from 'bcryptjs';
 import { generateJWT } from './utils/jwtGenerator.js';
 import { auth } from './middlewares/auth.js';
 import cors from 'cors';
+
+import { sendEmail }  from './utils/gmail-service.cjs';
+
 const pool = connectDatabase();
 const app = express();
 
@@ -13,8 +16,11 @@ app.use(cors());
 
 const PORT = 8000;
 
+// "test": "react-scripts test",
 //* LOGIN SESSIONS
 //! AUTHENTICATION ROUTES
+
+
 
 app.post('/login', async (req, res) => {
   try {
@@ -112,7 +118,9 @@ app.post('/register', async (req, res) => {
     const bcryptPassword = await bcrypt.hash(password, salt);
 
     const newAdmin = await pool.query(
-      `INSERT INTO admins (firstname, lastname, contactnumber, address, email, password, username) VALUES ('${firstname}', '${lastname}', ${contactNumber}, '${address}', '${email}', '${bcryptPassword}', '${username}') RETURNING *`
+      `INSERT INTO admins (firstname, lastname, contactnumber, address, email, password, username)
+       VALUES ('${firstname}', '${lastname}', '${contactNumber}', '${address}', '${email}', '${bcryptPassword}', '${username}')
+        RETURNING *`
     );
 
     const token = generateJWT(newAdmin.rows[0]);
@@ -122,6 +130,7 @@ app.post('/register', async (req, res) => {
     console.log(error);
   }
 });
+
 app.get('/profile', auth, async (req, res) => {
   try {
     res.json(req.user);
@@ -190,26 +199,68 @@ app.get('/email/:email', auth, async (req, res) => {
 });
 
 // New Client
+// app.post('/addClient', async (req, res) => {
+//   try {
+//     const { firstname, lastname, contactnumber, address, email, username, password } =
+//       req.body;
+
+//       console.log({ firstname, lastname, contactnumber, address, email, username, password }); // Debug
+
+//     const user = await pool.query(
+//       `SELECT * FROM clients WHERE username = '${username}'`
+//     );
+
+//     if (user.rows.length > 0) {
+//       res.status(401).send('User already exist');
+//     }
+
+//     const newClient = await pool.query(
+//       `INSERT INTO clients(firstname, lastname, contactnumber, address, email,  username, password) 
+//       VALUES ('${firstname}', '${lastname}', '${contactnumber}', '${address}', '${email}', '${username}', '${password}') RETURNING *`
+//     );
+
+//     res.json(newClient);
+//   } catch (error) {
+//     // console.log(error);
+
+//     // Add error logging to identify the issue:
+//     console.error('Error in addClient:', error.message);
+//     res.status(500).send('Server error');
+//   }
+// });
+
+//Add new client
 app.post('/addClient', async (req, res) => {
   try {
-    const { firstname, lastname, contactNumber, address, email, username } =
-      req.body;
+    const { firstname, lastname, contactnumber, address, email, username, password } = req.body;
+    console.log({ firstname, lastname, contactnumber, address, email, username, password }); // Debug
 
     const user = await pool.query(
-      `SELECT * FROM clients WHERE username = '${username}'`
+      `SELECT * FROM clients WHERE username = $1`,
+      [username]
     );
 
     if (user.rows.length > 0) {
-      res.status(401).send('User already exist');
+      return res.status(401).send('User already exist');
     }
 
+    const values = [firstname, lastname, contactnumber, address, email, username, password || null];
+    console.log('Insert values:', values); // Debug
+
     const newClient = await pool.query(
-      `INSERT INTO clients(firstname, lastname, contactnumber, address, email,  username) VALUES ('${firstname}', '${lastname}', ${contactNumber}, '${address}', '${email}', '${username}') RETURNING *`
+      `INSERT INTO clients(firstname, lastname, contactnumber, address, email, username, password) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      values
     );
 
-    res.json(newClient);
+    if (newClient.rows.length === 0) {
+      return res.status(500).send('Failed to add client');
+    }
+
+    res.json(newClient.rows[0]);
   } catch (error) {
-    console.log(error);
+    console.error('Error in addClient:', error.message);
+    res.status(500).send('Server error');
   }
 });
 
@@ -239,6 +290,7 @@ app.delete('/clients/:id', async (req, res) => {
     res.json({ msg: `Deleted client with an id of ${id}` });
   } catch (error) {
     console.log(error);
+
   }
 });
 
@@ -341,7 +393,8 @@ app.post('/loans/', auth, async (req, res) => {
     } = req.body;
 
     const newLoan = await pool.query(
-      `INSERT INTO loans(client_id, type, status, balance, gross_loan, amort, terms, date_released, maturity_date) VALUES (${client_id}, '${type}', '${status}',${balance}, ${gross_loan}, ${amort}, ${terms}, '${date_released}', '${maturity_date}') RETURNING *`
+      `INSERT INTO loans(client_id, type, status, balance, gross_loan, amort, terms, date_released, maturity_date) 
+      VALUES ('${client_id}', '${type}', '${status}','${balance}', '${gross_loan}', '${amort}', '${terms}', '${date_released}', '${maturity_date}') RETURNING *`
     );
 
     res.json(newLoan.rows[0]);
